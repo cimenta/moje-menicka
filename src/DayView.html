@@ -1,0 +1,136 @@
+<div id="day-view">
+  <div class="day-nav">
+    <button id="prev-day-btn" onclick="DayView.goPrev()">&laquo; Prev</button>
+    <h2 id="day-view-date"></h2>
+    <button id="next-day-btn" onclick="DayView.goNext()">Next &raquo;</button>
+  </div>
+  <div id="day-view-content"></div>
+</div>
+
+<script>
+  var DayView = (function () {
+    var dates = [];
+    var byDate = {};
+    var index = -1;
+
+    function localTodayIso() {
+      var d = new Date();
+      var mm = String(d.getMonth() + 1).padStart(2, '0');
+      var dd = String(d.getDate()).padStart(2, '0');
+      return d.getFullYear() + '-' + mm + '-' + dd;
+    }
+
+    function pickInitialIndex() {
+      var today = localTodayIso();
+      for (var i = 0; i < dates.length; i++) {
+        if (dates[i] === today) return i;
+      }
+      for (var i = 0; i < dates.length; i++) {
+        if (dates[i] > today) return i;
+      }
+      return dates.length - 1;
+    }
+
+    function showMessage(message) {
+      document.getElementById('day-view-date').textContent = 'No menu data yet';
+      document.getElementById('prev-day-btn').disabled = true;
+      document.getElementById('next-day-btn').disabled = true;
+      var content = document.getElementById('day-view-content');
+      content.innerHTML = '';
+      var el = document.createElement('div');
+      el.className = 'empty-state';
+      el.textContent = message;
+      content.appendChild(el);
+    }
+
+    function render() {
+      var date = dates[index];
+      var restaurants = byDate[date] || [];
+
+      document.getElementById('day-view-date').textContent = date;
+      document.getElementById('prev-day-btn').disabled = index <= 0;
+      document.getElementById('next-day-btn').disabled = index >= dates.length - 1;
+
+      var content = document.getElementById('day-view-content');
+      content.innerHTML = '';
+
+      if (restaurants.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = 'No menu data for this day.';
+        content.appendChild(empty);
+        return;
+      }
+
+      restaurants.forEach(function (restaurant) {
+        var card = document.createElement('div');
+        card.className = 'restaurant-card';
+
+        var title = document.createElement('h3');
+        title.textContent = restaurant.name;
+        card.appendChild(title);
+
+        var meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = [restaurant.address, restaurant.lunchHours].filter(Boolean).join(' • ');
+        card.appendChild(meta);
+
+        restaurant.items.forEach(function (item) {
+          var row = document.createElement('div');
+          row.className = 'menu-item' + (item.favourite ? ' favourite' : '');
+          var name = document.createElement('span');
+          name.textContent = (item.order ? item.order + '. ' : '') + item.name;
+          row.appendChild(name);
+          if (item.price) {
+            var price = document.createElement('span');
+            price.className = 'price';
+            price.textContent = item.price;
+            row.appendChild(price);
+          }
+          card.appendChild(row);
+        });
+
+        content.appendChild(card);
+      });
+    }
+
+    function refresh() {
+      var currentDate = dates[index];
+      google.script.run
+        .withSuccessHandler(function (data) {
+          dates = data.dates || [];
+          byDate = data.byDate || {};
+          if (dates.length === 0) {
+            showMessage('No menu data yet.');
+            return;
+          }
+          var keepIndex = currentDate ? dates.indexOf(currentDate) : -1;
+          index = keepIndex !== -1 ? keepIndex : pickInitialIndex();
+          render();
+        })
+        .withFailureHandler(function (error) {
+          console.error('getAllDayData failed:', error);
+          showMessage('Failed to load menu data: ' + (error && error.message ? error.message : String(error)));
+        })
+        .getAllDayData();
+    }
+
+    function goPrev() {
+      if (index > 0) {
+        index--;
+        render();
+      }
+    }
+
+    function goNext() {
+      if (index < dates.length - 1) {
+        index++;
+        render();
+      }
+    }
+
+    return { refresh: refresh, goPrev: goPrev, goNext: goNext };
+  })();
+
+  DayView.refresh();
+</script>
