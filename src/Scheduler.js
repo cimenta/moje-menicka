@@ -37,40 +37,48 @@ function runManualCheck(weekOffset) {
   return newEntryCount;
 }
 
+function fetchRestaurantMenu_(restaurant, targetDates) {
+  var existingDates = getExistingMenuDates(restaurant.URL);
+  var missingDates = targetDates.filter(function (date) { return !existingDates[date]; });
+  var needsMetaBackfill = !restaurant.Name;
+  if (missingDates.length === 0 && !needsMetaBackfill) {
+    return { newEntries: [] };
+  }
+  try {
+    var result = fetchWeek(restaurant.URL);
+    if (result.name) {
+      updateRestaurantMeta(restaurant._rowIndex, {
+        name: result.name,
+        address: result.address,
+        lunchHours: result.lunchHours
+      });
+    }
+    if (result.days.length === 0) {
+      logMessage(restaurant.URL, 'Fetched OK but found zero day blocks — menicka.cz markup may have changed');
+      return { newEntries: [] };
+    }
+    var newEntries = [];
+    result.days.forEach(function (day) {
+      if (missingDates.indexOf(day.date) === -1) return;
+      if (day.items.length === 0) return;
+      appendMenuDay(restaurant.URL, day);
+      newEntries.push({ restaurantName: result.name || restaurant.URL, date: day.date, items: day.items });
+    });
+    return { newEntries: newEntries };
+  } catch (e) {
+    logMessage(restaurant.URL, 'Fetch failed: ' + e.message);
+    return { newEntries: [], error: e.message };
+  }
+}
+
 function processRestaurants_(localToday, weekOffset, timezone, now) {
   var targetDates = getWeekdayIsoDates(localToday, weekOffset);
   var restaurants = getActiveRestaurants();
   var newEntries = [];
 
   restaurants.forEach(function (restaurant) {
-    var existingDates = getExistingMenuDates(restaurant.URL);
-    var missingDates = targetDates.filter(function (date) { return !existingDates[date]; });
-    var needsMetaBackfill = !restaurant.Name;
-    if (missingDates.length === 0 && !needsMetaBackfill) {
-      return;
-    }
-    try {
-      var result = fetchWeek(restaurant.URL);
-      if (result.name) {
-        updateRestaurantMeta(restaurant._rowIndex, {
-          name: result.name,
-          address: result.address,
-          lunchHours: result.lunchHours
-        });
-      }
-      if (result.days.length === 0) {
-        logMessage(restaurant.URL, 'Fetched OK but found zero day blocks — menicka.cz markup may have changed');
-        return;
-      }
-      result.days.forEach(function (day) {
-        if (missingDates.indexOf(day.date) === -1) return;
-        if (day.items.length === 0) return;
-        appendMenuDay(restaurant.URL, day);
-        newEntries.push({ restaurantName: result.name || restaurant.URL, date: day.date, items: day.items });
-      });
-    } catch (e) {
-      logMessage(restaurant.URL, 'Fetch failed: ' + e.message);
-    }
+    var result = fetchRestaurantMenu_(restaurant, targetDates);
+    newEntries = newEntries.concat(result.newEntries);
   });
 
   if (newEntries.length > 0) {
@@ -82,4 +90,24 @@ function processRestaurants_(localToday, weekOffset, timezone, now) {
   pruneOldMenuData(Utilities.formatDate(cutoff, timezone, 'yyyy-MM-dd'));
 
   return newEntries.length;
+}
+
+/**
+ * Fetches menu data for a single restaurant immediately, used right after
+ * it's added via the admin UI so its menu shows up without waiting for the
+ * next scheduled check. Sends the summary email if it finds new entries,
+ * same as a scheduled check would.
+ */
+function fetchNewRestaurant_(restaurant) {
+  var props = PropertiesService.getScriptProperties();
+  var timezone = props.getProperty('timezone') || Session.getScriptTimeZone();
+  var todayIso = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  var localToday = isoDateToLocalDate(todayIso);
+  var targetDates = getWeekdayIsoDates(localToday, 0);
+
+  var result = fetchRestaurantMenu_(restaurant, targetDates);
+  if (result.newEntries.length > 0) {
+    sendSummaryEmail(result.newEntries);
+  }
+  return result.error || null;
 }

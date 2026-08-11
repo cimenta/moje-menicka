@@ -35,6 +35,7 @@
       </table>
       <input type="url" id="new-restaurant-url" placeholder="https://www.menicka.cz/...">
       <button class="primary" onclick="addRestaurantClick()">Add</button>
+      <span id="add-restaurant-status" class="status-line"></span>
     </div>
 
     <div id="subtab-favourites" class="tab-panel">
@@ -235,12 +236,16 @@
       var input = document.getElementById('new-restaurant-url');
       var url = input.value.trim();
       if (!url) return;
-      google.script.run.withSuccessHandler(function (restaurants) {
-        renderRestaurants(restaurants);
+      var status = document.getElementById('add-restaurant-status');
+      status.textContent = 'Adding and fetching menu...';
+      google.script.run.withSuccessHandler(function (result) {
+        renderRestaurants(result.restaurants);
         input.value = '';
         DayView.refresh();
+        status.textContent = result.fetchError ? 'Added, but menu fetch failed: ' + result.fetchError : 'Added.';
       }).withFailureHandler(function (error) {
         console.error('addRestaurant failed:', error);
+        status.textContent = '';
         alert('Failed to add restaurant: ' + (error && error.message ? error.message : String(error)));
       }).addRestaurant(url);
     }

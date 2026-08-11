@@ -59,7 +59,10 @@ function getAdminData() {
 function addRestaurant(url) {
   assertAdminDeployment_();
   addRestaurantRow(url);
-  return getAllRestaurants();
+  var restaurants = getAllRestaurants();
+  var newRestaurant = restaurants[restaurants.length - 1];
+  var fetchError = fetchNewRestaurant_(newRestaurant);
+  return { restaurants: getAllRestaurants(), fetchError: fetchError };
 }
 
 function removeRestaurant(rowIndex) {
