@@ -37,6 +37,12 @@ function runManualCheck(weekOffset) {
   return newEntryCount;
 }
 
+function getMaxFetchFailures_() {
+  var raw = PropertiesService.getScriptProperties().getProperty('maxFetchFailures');
+  var n = parseInt(raw, 10);
+  return Number.isInteger(n) && n > 0 ? n : 3;
+}
+
 function fetchRestaurantMenu_(restaurant, targetDates) {
   var existingDates = getExistingMenuDates(restaurant.URL);
   var missingDates = targetDates.filter(function (date) { return !existingDates[date]; });
@@ -46,6 +52,9 @@ function fetchRestaurantMenu_(restaurant, targetDates) {
   }
   try {
     var result = fetchWeek(restaurant.URL);
+    if (restaurant.FailureCount) {
+      resetRestaurantFailureCount_(restaurant._rowIndex);
+    }
     if (result.name) {
       updateRestaurantMeta(restaurant._rowIndex, {
         name: result.name,
@@ -67,6 +76,12 @@ function fetchRestaurantMenu_(restaurant, targetDates) {
     return { newEntries: newEntries };
   } catch (e) {
     logMessage(restaurant.URL, 'Fetch failed: ' + e.message);
+    var failureCount = recordRestaurantFailure_(restaurant._rowIndex, restaurant.FailureCount);
+    var maxFailures = getMaxFetchFailures_();
+    if (failureCount >= maxFailures) {
+      deactivateRestaurantRow_(restaurant._rowIndex);
+      sendFetchFailureAlert_(restaurant, failureCount, e.message);
+    }
     return { newEntries: [], error: e.message };
   }
 }

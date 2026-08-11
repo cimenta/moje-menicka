@@ -6,7 +6,7 @@ var SHEET_NAMES = {
 };
 
 var SHEET_HEADERS = {
-  Restaurants: ['URL', 'SourceType', 'Active', 'Name', 'Address', 'LunchHours'],
+  Restaurants: ['URL', 'SourceType', 'Active', 'Name', 'Address', 'LunchHours', 'FailureCount'],
   FavouriteFoods: ['Include', 'Exclude'],
   MenuData: ['RestaurantUrl', 'Date', 'Type', 'Order', 'Name', 'Price', 'FetchedAt'],
   Logs: ['Timestamp', 'RestaurantUrl', 'Message']
@@ -36,6 +36,13 @@ function getOrCreateSheet_(name) {
   } else if (name === SHEET_NAMES.FAVOURITES && sheet.getLastRow() <= 1) {
     var headers = SHEET_HEADERS[name];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else if (name === SHEET_NAMES.RESTAURANTS) {
+    var expectedHeaders = SHEET_HEADERS[name];
+    var currentWidth = sheet.getLastColumn();
+    if (currentWidth < expectedHeaders.length) {
+      sheet.getRange(1, currentWidth + 1, 1, expectedHeaders.length - currentWidth)
+        .setValues([expectedHeaders.slice(currentWidth)]);
+    }
   }
   return sheet;
 }
@@ -137,6 +144,26 @@ function setRestaurantActiveFlag(rowIndex, active) {
   assertAdminDeployment_();
   var sheet = getOrCreateSheet_(SHEET_NAMES.RESTAURANTS);
   sheet.getRange(rowIndex, 3).setValue(active);
+  if (active) {
+    sheet.getRange(rowIndex, 7).setValue(0);
+  }
+}
+
+function recordRestaurantFailure_(rowIndex, currentCount) {
+  var sheet = getOrCreateSheet_(SHEET_NAMES.RESTAURANTS);
+  var newCount = (Number(currentCount) || 0) + 1;
+  sheet.getRange(rowIndex, 7).setValue(newCount);
+  return newCount;
+}
+
+function resetRestaurantFailureCount_(rowIndex) {
+  var sheet = getOrCreateSheet_(SHEET_NAMES.RESTAURANTS);
+  sheet.getRange(rowIndex, 7).setValue(0);
+}
+
+function deactivateRestaurantRow_(rowIndex) {
+  var sheet = getOrCreateSheet_(SHEET_NAMES.RESTAURANTS);
+  sheet.getRange(rowIndex, 3).setValue(false);
 }
 
 function updateRestaurantRow(rowIndex, fields) {

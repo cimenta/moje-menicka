@@ -51,7 +51,8 @@ function getAdminData() {
       timezone: props.getProperty('timezone') || Session.getScriptTimeZone(),
       publicPageEnabled: props.getProperty('publicPageEnabled') === 'true',
       weekdayCheckHours: props.getProperty('weekdayCheckHours') || '6,7,8,9',
-      sundayCheckHours: props.getProperty('sundayCheckHours') || '17,19,21,22'
+      sundayCheckHours: props.getProperty('sundayCheckHours') || '17,19,21,22',
+      maxFetchFailures: parseInt(props.getProperty('maxFetchFailures'), 10) || 3
     }
   };
 }
@@ -118,6 +119,12 @@ function saveSettings(settings) {
     throw new Error('Sunday check hours must be a comma-separated list of numbers 0-23.');
   }
   props.setProperty('sundayCheckHours', sundayHours);
+
+  var maxFailures = parseInt(settings.maxFetchFailures, 10);
+  if (!Number.isInteger(maxFailures) || maxFailures < 1) {
+    throw new Error('Max fetch failures must be a whole number of 1 or more.');
+  }
+  props.setProperty('maxFetchFailures', String(maxFailures));
 }
 
 function triggerManualCheck() {

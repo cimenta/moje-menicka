@@ -30,6 +30,10 @@ function setup() {
     props.setProperty('sundayCheckHours', '17,19,21,22');
   }
 
+  if (!props.getProperty('maxFetchFailures')) {
+    props.setProperty('maxFetchFailures', '3');
+  }
+
   var hasTrigger = ScriptApp.getProjectTriggers().some(function (t) {
     return t.getHandlerFunction() === 'checkMenus';
   });

@@ -29,7 +29,7 @@
     <div id="subtab-restaurants" class="tab-panel active">
       <table>
         <thead>
-          <tr><th>URL</th><th>Name</th><th>Address</th><th>Lunch Hours</th><th>Active</th><th></th></tr>
+          <tr><th>URL</th><th>Name</th><th>Address</th><th>Lunch Hours</th><th>Active</th><th>Failures</th><th></th></tr>
         </thead>
         <tbody id="restaurants-tbody"></tbody>
       </table>
@@ -65,6 +65,11 @@
       <p>
         <label>Sunday check hours (0-23, comma-separated) — checks for next week's menu:<br>
           <input type="text" id="settings-sunday-hours" placeholder="17,19,21,22">
+        </label>
+      </p>
+      <p>
+        <label>Deactivate a restaurant after this many fetch failures in a row:<br>
+          <input type="number" id="settings-max-failures" min="1" step="1" placeholder="3">
         </label>
       </p>
       <button class="primary" onclick="saveSettingsClick()">Save</button>
@@ -167,6 +172,16 @@
         };
         tdActive.appendChild(checkbox);
         tr.appendChild(tdActive);
+
+        var tdFailures = document.createElement('td');
+        var failureCount = Number(r.FailureCount) || 0;
+        if (r.Active !== true && failureCount > 0) {
+          tdFailures.textContent = failureCount + ' (auto-deactivated)';
+          tdFailures.className = 'danger-text';
+        } else {
+          tdFailures.textContent = failureCount > 0 ? String(failureCount) : '';
+        }
+        tr.appendChild(tdFailures);
 
         var tdActions = document.createElement('td');
         if (editing) {
@@ -351,6 +366,7 @@
       document.getElementById('settings-public-enabled').checked = settings.publicPageEnabled === true;
       document.getElementById('settings-weekday-hours').value = settings.weekdayCheckHours || '';
       document.getElementById('settings-sunday-hours').value = settings.sundayCheckHours || '';
+      document.getElementById('settings-max-failures').value = settings.maxFetchFailures || 3;
     }
 
     function saveSettingsClick() {
@@ -358,7 +374,8 @@
         timezone: document.getElementById('settings-timezone').value.trim(),
         publicPageEnabled: document.getElementById('settings-public-enabled').checked,
         weekdayCheckHours: document.getElementById('settings-weekday-hours').value.trim(),
-        sundayCheckHours: document.getElementById('settings-sunday-hours').value.trim()
+        sundayCheckHours: document.getElementById('settings-sunday-hours').value.trim(),
+        maxFetchFailures: document.getElementById('settings-max-failures').value.trim()
       };
       var status = document.getElementById('settings-status');
       status.textContent = 'Saving...';
