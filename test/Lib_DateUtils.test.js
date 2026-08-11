@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  parseCzechDate, isConfiguredCheckHour, isoDateToLocalDate, getWeekdayIsoDates
+  parseCzechDate, isConfiguredCheckHour, parseHourList, isoDateToLocalDate, getWeekdayIsoDates
 } = require('../src/Lib_DateUtils.js');
 
 test('parseCzechDate extracts D.M.YYYY into ISO format', () => {
@@ -27,6 +27,30 @@ test('isConfiguredCheckHour returns null outside configured hours', () => {
   assert.equal(isConfiguredCheckHour(1, 12), null);
   assert.equal(isConfiguredCheckHour(6, 8), null);
   assert.equal(isConfiguredCheckHour(0, 9), null);
+});
+
+test('isConfiguredCheckHour honors custom hour lists over the defaults', () => {
+  assert.equal(isConfiguredCheckHour(1, 6, [10], [17]), null);
+  assert.equal(isConfiguredCheckHour(1, 10, [10], [17]), 'this-week');
+  assert.equal(isConfiguredCheckHour(0, 17, [10], [17]), 'next-week');
+});
+
+test('isConfiguredCheckHour treats an explicitly empty hour list as never matching', () => {
+  assert.equal(isConfiguredCheckHour(1, 6, [], [17]), null);
+});
+
+test('parseHourList parses a comma-separated list of valid hours', () => {
+  assert.deepEqual(parseHourList('6,7,8,9'), [6, 7, 8, 9]);
+  assert.deepEqual(parseHourList(' 6 , 7 '), [6, 7]);
+});
+
+test('parseHourList drops out-of-range or non-numeric entries', () => {
+  assert.deepEqual(parseHourList('6,24,-1,abc,9'), [6, 9]);
+});
+
+test('parseHourList returns an empty array for blank or missing input', () => {
+  assert.deepEqual(parseHourList(''), []);
+  assert.deepEqual(parseHourList(null), []);
 });
 
 test('isoDateToLocalDate produces the correct weekday for a known date', () => {

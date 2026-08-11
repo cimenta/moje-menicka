@@ -5,16 +5,23 @@ function parseCzechDate(text) {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
-function isConfiguredCheckHour(weekday, hour) {
-  const WEEKDAY_HOURS = [6, 7, 8, 9];
-  const SUNDAY_HOURS = [17, 19, 21, 22];
-  if (weekday >= 1 && weekday <= 5 && WEEKDAY_HOURS.indexOf(hour) !== -1) {
+function isConfiguredCheckHour(weekday, hour, weekdayHours, sundayHours) {
+  weekdayHours = weekdayHours || [6, 7, 8, 9];
+  sundayHours = sundayHours || [17, 19, 21, 22];
+  if (weekday >= 1 && weekday <= 5 && weekdayHours.indexOf(hour) !== -1) {
     return 'this-week';
   }
-  if (weekday === 0 && SUNDAY_HOURS.indexOf(hour) !== -1) {
+  if (weekday === 0 && sundayHours.indexOf(hour) !== -1) {
     return 'next-week';
   }
   return null;
+}
+
+function parseHourList(text) {
+  if (!text) return [];
+  return text.split(',')
+    .map(function (part) { return parseInt(part.trim(), 10); })
+    .filter(function (n) { return Number.isInteger(n) && n >= 0 && n <= 23; });
 }
 
 function isoDateToLocalDate(isoDateStr) {
@@ -51,7 +58,7 @@ function getWeekdayIsoDates(referenceDate, weekOffset) {
 
 if (typeof module !== 'undefined') {
   module.exports = {
-    parseCzechDate, isConfiguredCheckHour, isoDateToLocalDate, formatIsoDate,
+    parseCzechDate, isConfiguredCheckHour, parseHourList, isoDateToLocalDate, formatIsoDate,
     getMondayOfWeek, getWeekdayIsoDates
   };
 }

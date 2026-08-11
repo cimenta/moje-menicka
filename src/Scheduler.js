@@ -7,7 +7,11 @@ function checkMenus() {
   var weekday = localToday.getDay();
   var hour = Number(Utilities.formatDate(now, timezone, 'H'));
 
-  var window = isConfiguredCheckHour(weekday, hour);
+  var weekdayHoursProp = props.getProperty('weekdayCheckHours');
+  var sundayHoursProp = props.getProperty('sundayCheckHours');
+  var weekdayHours = weekdayHoursProp === null ? undefined : parseHourList(weekdayHoursProp);
+  var sundayHours = sundayHoursProp === null ? undefined : parseHourList(sundayHoursProp);
+  var window = isConfiguredCheckHour(weekday, hour, weekdayHours, sundayHours);
   if (!window) {
     return;
   }
@@ -41,7 +45,8 @@ function processRestaurants_(localToday, weekOffset, timezone, now) {
   restaurants.forEach(function (restaurant) {
     var existingDates = getExistingMenuDates(restaurant.URL);
     var missingDates = targetDates.filter(function (date) { return !existingDates[date]; });
-    if (missingDates.length === 0) {
+    var needsMetaBackfill = !restaurant.Name;
+    if (missingDates.length === 0 && !needsMetaBackfill) {
       return;
     }
     try {

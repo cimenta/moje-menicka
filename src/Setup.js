@@ -22,6 +22,14 @@ function setup() {
     props.setProperty('publicPageEnabled', 'false');
   }
 
+  if (!props.getProperty('weekdayCheckHours')) {
+    props.setProperty('weekdayCheckHours', '6,7,8,9');
+  }
+
+  if (!props.getProperty('sundayCheckHours')) {
+    props.setProperty('sundayCheckHours', '17,19,21,22');
+  }
+
   var hasTrigger = ScriptApp.getProjectTriggers().some(function (t) {
     return t.getHandlerFunction() === 'checkMenus';
   });

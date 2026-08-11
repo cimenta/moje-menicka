@@ -49,7 +49,9 @@ function getAdminData() {
     favouriteFoods: getAllFavouriteFoodRows(),
     settings: {
       timezone: props.getProperty('timezone') || Session.getScriptTimeZone(),
-      publicPageEnabled: props.getProperty('publicPageEnabled') === 'true'
+      publicPageEnabled: props.getProperty('publicPageEnabled') === 'true',
+      weekdayCheckHours: props.getProperty('weekdayCheckHours') || '6,7,8,9',
+      sundayCheckHours: props.getProperty('sundayCheckHours') || '17,19,21,22'
     }
   };
 }
@@ -101,6 +103,18 @@ function saveSettings(settings) {
   var props = PropertiesService.getScriptProperties();
   props.setProperty('timezone', settings.timezone);
   props.setProperty('publicPageEnabled', settings.publicPageEnabled ? 'true' : 'false');
+
+  var weekdayHours = (settings.weekdayCheckHours || '').trim();
+  if (weekdayHours && parseHourList(weekdayHours).length === 0) {
+    throw new Error('Weekday check hours must be a comma-separated list of numbers 0-23.');
+  }
+  props.setProperty('weekdayCheckHours', weekdayHours);
+
+  var sundayHours = (settings.sundayCheckHours || '').trim();
+  if (sundayHours && parseHourList(sundayHours).length === 0) {
+    throw new Error('Sunday check hours must be a comma-separated list of numbers 0-23.');
+  }
+  props.setProperty('sundayCheckHours', sundayHours);
 }
 
 function triggerManualCheck() {
