@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <h1>Menicka Admin</h1>
+
+  <div class="tabs" id="main-tabs">
+    <button class="tab-button active" onclick="showTab('menus')">Menus</button>
+    <button class="tab-button" onclick="showTab('settings')">Settings</button>
+  </div>
+
+  <div id="tab-menus" class="tab-panel active">
+    <?!= include('DayView'); ?>
+  </div>
+
+  <div id="tab-settings" class="tab-panel">
+    <button class="primary" onclick="checkNow()">Check now</button>
+    <span id="check-now-status" class="status-line"></span>
+
+    <div class="tabs" id="sub-tabs" style="margin-top:16px;">
+      <button class="tab-button active" onclick="showSubTab('restaurants')">Restaurants</button>
+      <button class="tab-button" onclick="showSubTab('favourites')">Favourite Foods</button>
+      <button class="tab-button" onclick="showSubTab('prefs')">Settings</button>
+    </div>
+
+    <div id="subtab-restaurants" class="tab-panel active">
+      <table>
+        <thead>
+          <tr><th>URL</th><th>Name</th><th>Address</th><th>Lunch Hours</th><th>Active</th><th></th></tr>
+        </thead>
+        <tbody id="restaurants-tbody"></tbody>
+      </table>
+      <input type="url" id="new-restaurant-url" placeholder="https://www.menicka.cz/...">
+      <button class="primary" onclick="addRestaurantClick()">Add</button>
+    </div>
+
+    <div id="subtab-favourites" class="tab-panel">
+      <ul id="favourites-list"></ul>
+      <input type="text" id="new-favourite-include" placeholder="Must include, e.g. čočka na kyselo">
+      <input type="text" id="new-favourite-exclude" placeholder="Exclude (optional), e.g. klobása">
+      <button class="primary" onclick="addFavouriteClick()">Add</button>
+    </div>
+
+    <div id="subtab-prefs" class="tab-panel">
+      <p>
+        <label>Timezone:<br>
+          <input type="text" id="settings-timezone">
+        </label>
+      </p>
+      <p>
+        <label>
+          <input type="checkbox" id="settings-public-enabled">
+          Public page enabled
+        </label>
+      </p>
+      <button class="primary" onclick="saveSettingsClick()">Save</button>
+      <span id="settings-status" class="status-line"></span>
+    </div>
+  </div>
+
+  <footer class="version">v<?= APP_VERSION ?></footer>
+
+  <script>
+    function showTab(name) {
+      var buttons = document.getElementById('main-tabs').querySelectorAll('.tab-button');
+      buttons[0].classList.toggle('active', name === 'menus');
+      buttons[1].classList.toggle('active', name === 'settings');
+      document.getElementById('tab-menus').classList.toggle('active', name === 'menus');
+      document.getElementById('tab-settings').classList.toggle('active', name === 'settings');
+    }
+
+    function showSubTab(name) {
+      var order = ['restaurants', 'favourites', 'prefs'];
+      var panels = { restaurants: 'subtab-restaurants', favourites: 'subtab-favourites', prefs: 'subtab-prefs' };
+      var buttons = document.getElementById('sub-tabs').querySelectorAll('.tab-button');
+      buttons.forEach(function (btn, i) {
+        btn.classList.toggle('active', order[i] === name);
+      });
+      Object.keys(panels).forEach(function (key) {
+        document.getElementById(panels[key]).classList.toggle('active', key === name);
+      });
+    }
+
+    var editingRestaurantRowIndex = null;
+
+    function renderRestaurants(restaurants) {
+      var tbody = document.getElementById('restaurants-tbody');
+      tbody.innerHTML = '';
+      restaurants.forEach(function (r) {
+        var tr = document.createElement('tr');
+        var editing = editingRestaurantRowIndex === r._rowIndex;
+
+        var urlInput, nameInput, addressInput, lunchInput;
+
+        var tdUrl = document.createElement('td');
+        if (editing) {
+          urlInput = document.createElement('input');
+          urlInput.type = 'url';
+          urlInput.value = r.URL || '';
+          tdUrl.appendChild(urlInput);
+        } else {
+          tdUrl.textContent = r.URL;
+        }
+        tr.appendChild(tdUrl);
+
+        var tdName = document.createElement('td');
+        if (editing) {
+          nameInput = document.createElement('input');
+          nameInput.type = 'text';
+          nameInput.value = r.Name || '';
+          tdName.appendChild(nameInput);
+        } else {
+          tdName.textContent = r.Name || '';
+        }
+        tr.appendChild(tdName);
+
+        var tdAddress = document.createElement('td');
+        if (editing) {
+          addressInput = document.createElement('input');
+          addressInput.type = 'text';
+          addressInput.value = r.Address || '';
+          tdAddress.appendChild(addressInput);
+        } else {
+          tdAddress.textContent = r.Address || '';
+        }
+        tr.appendChild(tdAddress);
+
+        var tdLunch = document.createElement('td');
+        if (editing) {
+          lunchInput = document.createElement('input');
+          lunchInput.type = 'text';
+          lunchInput.value = r.LunchHours || '';
+          tdLunch.appendChild(lunchInput);
+        } else {
+          tdLunch.textContent = r.LunchHours || '';
+        }
+        tr.appendChild(tdLunch);
+
+        var tdActive = document.createElement('td');
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = r.Active === true;
+        checkbox.onchange = function () {
+          google.script.run.withSuccessHandler(function (restaurants) {
+            renderRestaurants(restaurants);
+            DayView.refresh();
+          })
+            .withFailureHandler(function (error) {
+              console.error('setRestaurantActive failed:', error);
+              alert('Failed to update restaurant: ' + (error && error.message ? error.message : String(error)));
+            })
+            .setRestaurantActive(r._rowIndex, checkbox.checked);
+        };
+        tdActive.appendChild(checkbox);
+        tr.appendChild(tdActive);
+
+        var tdActions = document.createElement('td');
+        if (editing) {
+          var saveBtn = document.createElement('button');
+          saveBtn.className = 'primary';
+          saveBtn.textContent = 'Save';
+          saveBtn.onclick = function () {
+            var url = urlInput.value.trim();
+            if (!url) return;
+            google.script.run.withSuccessHandler(function (restaurants) {
+              editingRestaurantRowIndex = null;
+              renderRestaurants(restaurants);
+              DayView.refresh();
+            })
+              .withFailureHandler(function (error) {
+                console.error('updateRestaurant failed:', error);
+                alert('Failed to update restaurant: ' + (error && error.message ? error.message : String(error)));
+              })
+              .updateRestaurant(r._rowIndex, {
+                url: url,
+                name: nameInput.value.trim(),
+                address: addressInput.value.trim(),
+                lunchHours: lunchInput.value.trim()
+              });
+          };
+          tdActions.appendChild(saveBtn);
+
+          var cancelBtn = document.createElement('button');
+          cancelBtn.textContent = 'Cancel';
+          cancelBtn.onclick = function () {
+            editingRestaurantRowIndex = null;
+            renderRestaurants(restaurants);
+          };
+          tdActions.appendChild(cancelBtn);
+        } else {
+          var editBtn = document.createElement('button');
+          editBtn.textContent = 'Edit';
+          editBtn.onclick = function () {
+            editingRestaurantRowIndex = r._rowIndex;
+            renderRestaurants(restaurants);
+          };
+          tdActions.appendChild(editBtn);
+
+          var removeBtn = document.createElement('button');
+          removeBtn.className = 'danger';
+          removeBtn.textContent = 'Remove';
+          removeBtn.onclick = function () {
+            google.script.run.withSuccessHandler(function (restaurants) {
+              renderRestaurants(restaurants);
+              DayView.refresh();
+            })
+              .withFailureHandler(function (error) {
+                console.error('removeRestaurant failed:', error);
+                alert('Failed to remove restaurant: ' + (error && error.message ? error.message : String(error)));
+              })
+              .removeRestaurant(r._rowIndex);
+          };
+          tdActions.appendChild(removeBtn);
+        }
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addRestaurantClick() {
+      var input = document.getElementById('new-restaurant-url');
+      var url = input.value.trim();
+      if (!url) return;
+      google.script.run.withSuccessHandler(function (restaurants) {
+        renderRestaurants(restaurants);
+        input.value = '';
+        DayView.refresh();
+      }).withFailureHandler(function (error) {
+        console.error('addRestaurant failed:', error);
+        alert('Failed to add restaurant: ' + (error && error.message ? error.message : String(error)));
+      }).addRestaurant(url);
+    }
+
+    var editingFavouriteRowIndex = null;
+
+    function renderFavourites(favourites) {
+      var list = document.getElementById('favourites-list');
+      list.innerHTML = '';
+      favourites.forEach(function (f) {
+        var li = document.createElement('li');
+
+        if (editingFavouriteRowIndex === f._rowIndex) {
+          var includeInput = document.createElement('input');
+          includeInput.type = 'text';
+          includeInput.value = f.Include || '';
+          li.appendChild(includeInput);
+
+          var excludeInput = document.createElement('input');
+          excludeInput.type = 'text';
+          excludeInput.placeholder = 'Exclude (optional)';
+          excludeInput.value = f.Exclude || '';
+          li.appendChild(excludeInput);
+
+          var saveBtn = document.createElement('button');
+          saveBtn.className = 'primary';
+          saveBtn.textContent = 'Save';
+          saveBtn.onclick = function () {
+            var include = includeInput.value.trim();
+            if (!include) return;
+            google.script.run.withSuccessHandler(function (favourites) {
+              editingFavouriteRowIndex = null;
+              renderFavourites(favourites);
+              DayView.refresh();
+            })
+              .withFailureHandler(function (error) {
+                console.error('updateFavouriteFood failed:', error);
+                alert('Failed to update favourite food: ' + (error && error.message ? error.message : String(error)));
+              })
+              .updateFavouriteFood(f._rowIndex, include, excludeInput.value.trim());
+          };
+          li.appendChild(saveBtn);
+
+          var cancelBtn = document.createElement('button');
+          cancelBtn.textContent = 'Cancel';
+          cancelBtn.onclick = function () {
+            editingFavouriteRowIndex = null;
+            renderFavourites(favourites);
+          };
+          li.appendChild(cancelBtn);
+        } else {
+          var label = document.createElement('span');
+          label.textContent = f.Include + (f.Exclude ? ' — except: ' + f.Exclude : '') + ' ';
+          li.appendChild(label);
+
+          var editBtn = document.createElement('button');
+          editBtn.textContent = 'Edit';
+          editBtn.onclick = function () {
+            editingFavouriteRowIndex = f._rowIndex;
+            renderFavourites(favourites);
+          };
+          li.appendChild(editBtn);
+
+          var removeBtn = document.createElement('button');
+          removeBtn.className = 'danger';
+          removeBtn.textContent = 'Remove';
+          removeBtn.onclick = function () {
+            google.script.run.withSuccessHandler(function (favourites) {
+              renderFavourites(favourites);
+              DayView.refresh();
+            })
+              .withFailureHandler(function (error) {
+                console.error('removeFavouriteFood failed:', error);
+                alert('Failed to remove favourite food: ' + (error && error.message ? error.message : String(error)));
+              })
+              .removeFavouriteFood(f._rowIndex);
+          };
+          li.appendChild(removeBtn);
+        }
+
+        list.appendChild(li);
+      });
+    }
+
+    function addFavouriteClick() {
+      var includeInput = document.getElementById('new-favourite-include');
+      var excludeInput = document.getElementById('new-favourite-exclude');
+      var include = includeInput.value.trim();
+      if (!include) return;
+      google.script.run.withSuccessHandler(function (favourites) {
+        renderFavourites(favourites);
+        includeInput.value = '';
+        excludeInput.value = '';
+        DayView.refresh();
+      }).withFailureHandler(function (error) {
+        console.error('addFavouriteFood failed:', error);
+        alert('Failed to add favourite food: ' + (error && error.message ? error.message : String(error)));
+      }).addFavouriteFood(include, excludeInput.value.trim());
+    }
+
+    function renderSettings(settings) {
+      document.getElementById('settings-timezone').value = settings.timezone || '';
+      document.getElementById('settings-public-enabled').checked = settings.publicPageEnabled === true;
+    }
+
+    function saveSettingsClick() {
+      var settings = {
+        timezone: document.getElementById('settings-timezone').value.trim(),
+        publicPageEnabled: document.getElementById('settings-public-enabled').checked
+      };
+      var status = document.getElementById('settings-status');
+      status.textContent = 'Saving...';
+      google.script.run.withSuccessHandler(function () {
+        status.textContent = 'Saved.';
+      }).withFailureHandler(function (error) {
+        console.error('saveSettings failed:', error);
+        status.textContent = 'Failed to save: ' + (error && error.message ? error.message : String(error));
+      }).saveSettings(settings);
+    }
+
+    function checkNow() {
+      var status = document.getElementById('check-now-status');
+      status.textContent = 'Checking...';
+      google.script.run.withSuccessHandler(function (count) {
+        status.textContent = count > 0 ? (count + ' new menu(s) fetched.') : 'Nothing new.';
+        google.script.run.withSuccessHandler(renderRestaurants).getAllRestaurants();
+        DayView.refresh();
+      }).withFailureHandler(function (error) {
+        console.error('triggerManualCheck failed:', error);
+        status.textContent = 'Check failed: ' + (error && error.message ? error.message : String(error));
+      }).triggerManualCheck();
+    }
+
+    google.script.run.withSuccessHandler(function (data) {
+      renderRestaurants(data.restaurants);
+      renderFavourites(data.favouriteFoods);
+      renderSettings(data.settings);
+    }).withFailureHandler(function (error) {
+      console.error('getAdminData failed:', error);
+      var message = error && error.message ? error.message : String(error);
+      var errorEl = document.createElement('div');
+      errorEl.className = 'empty-state';
+      errorEl.textContent = 'Failed to load admin data: ' + message;
+      document.body.insertBefore(errorEl, document.body.firstChild);
+    }).getAdminData();
+  </script>
+</body>
+</html>
