@@ -10,6 +10,7 @@ A Google Apps Script app that scrapes daily lunch menus from [menicka.cz](https:
 - **Admin web UI** — manage restaurants (add/edit/remove/toggle active) and favourite foods (add/edit/remove), view the same day-by-day menu view as the public page, trigger an on-demand check, and toggle the public page on/off.
 - **Public web UI** (optional) — a read-only day-by-day menu viewer, gated behind a Script Property so it's off by default.
 - **Instant day navigation** — the web UI loads all currently-available days once and switches between them client-side, so Prev/Next has no network round-trip.
+- **Menu API** — a machine-readable `?format=json` or `?format=html` endpoint on the public deployment, for scripts and automations (e.g. a scheduled job that emails yourself today's menu).
 
 ## Project layout
 
@@ -55,6 +56,25 @@ src/
 | `timezone` | Timezone used for date calculations | script's default timezone |
 | `publicPageEnabled` | Whether the public deployment serves real data | `false` |
 | `adminDeploymentUrl` | The Admin deployment's `/exec` URL — required for admin routing and RPC authorization to work | unset |
+
+## Menu API
+
+Alongside the interactive web page, the public deployment also serves a
+machine-readable API on the same URL, gated by the same `publicPageEnabled`
+Script Property as the page itself:
+
+- `<public-deployment-url>?format=json&range=today` / `range=week` — JSON,
+  for scripts and automations.
+- `<public-deployment-url>?format=html&range=today` / `range=week` — a
+  self-contained HTML document (e.g. for a script that emails today's menu
+  to you) — favourite dishes are highlighted the same way the daily email
+  already highlights them.
+
+`range=week` returns Monday–Friday of the current (ISO) week. Both modes
+return an `error` field/message when `publicPageEnabled` is off or `range`
+is missing/invalid; Apps Script can't set a non-200 HTTP status from
+`doGet`, so errors come back as HTTP 200. See `WebApp.js`'s
+`handleJsonApi_`/`handleHtmlApi_` for the implementation.
 
 ## Security model
 

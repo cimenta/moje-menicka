@@ -26,10 +26,86 @@ function doGet(e) {
     return renderTemplate_('Admin');
   }
   var publicEnabled = PropertiesService.getScriptProperties().getProperty('publicPageEnabled') === 'true';
+  if (e && e.parameter && e.parameter.format === 'json') {
+    return handleJsonApi_(e.parameter, publicEnabled);
+  }
+  if (e && e.parameter && e.parameter.format === 'html') {
+    return handleHtmlApi_(e.parameter, publicEnabled);
+  }
   if (!publicEnabled) {
     return renderTemplate_('NotAvailable');
   }
   return renderTemplate_('Public');
+}
+
+function jsonOutput_(data) {
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleJsonApi_(params, publicEnabled) {
+  if (!publicEnabled) {
+    return jsonOutput_({ error: 'Not available.' });
+  }
+  if (params.range === 'today') {
+    return jsonOutput_(getTodayMenuData_());
+  }
+  if (params.range === 'week') {
+    return jsonOutput_(getWeekMenuData_());
+  }
+  return jsonOutput_({ error: 'Invalid or missing range parameter. Use range=today or range=week.' });
+}
+
+function getTodayIso_() {
+  var props = PropertiesService.getScriptProperties();
+  var timezone = props.getProperty('timezone') || Session.getScriptTimeZone();
+  return Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+}
+
+function getTodayMenuData_() {
+  var todayIso = getTodayIso_();
+  return { date: todayIso, restaurants: getMenuForDate(todayIso) };
+}
+
+function getWeekMenuData_() {
+  var todayIso = getTodayIso_();
+  var weekdayDates = getWeekdayIsoDates(isoDateToLocalDate(todayIso), 0);
+  return {
+    days: weekdayDates.map(function (isoDate) {
+      return { date: isoDate, restaurants: getMenuForDate(isoDate) };
+    })
+  };
+}
+
+function htmlOutput_(html) {
+  return ContentService.createTextOutput(html).setMimeType(ContentService.MimeType.HTML);
+}
+
+function handleHtmlApi_(params, publicEnabled) {
+  if (!publicEnabled) {
+    return htmlOutput_('<html><body><p>Not available.</p></body></html>');
+  }
+  if (params.range === 'today') {
+    return htmlOutput_(buildTodayMenuHtml_());
+  }
+  if (params.range === 'week') {
+    return htmlOutput_(buildWeekMenuHtml_());
+  }
+  return htmlOutput_('<html><body><p>Invalid or missing range parameter. Use range=today or range=week.</p></body></html>');
+}
+
+function buildTodayMenuHtml_() {
+  var data = getTodayMenuData_();
+  return '<html><head><meta charset="utf-8"></head><body>' +
+    buildDayMenuHtml_(data.date, data.restaurants) +
+    '</body></html>';
+}
+
+function buildWeekMenuHtml_() {
+  var data = getWeekMenuData_();
+  var body = data.days.map(function (day) {
+    return buildDayMenuHtml_(day.date, day.restaurants);
+  }).join('');
+  return '<html><head><meta charset="utf-8"></head><body>' + body + '</body></html>';
 }
 
 function getAllDayData() {

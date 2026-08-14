@@ -27,6 +27,31 @@ function buildSummaryEmailBody_(entries, favouriteFoods) {
   return html;
 }
 
+function buildDayMenuHtml_(dateIso, restaurants) {
+  var html = '<h2>' + escapeHtml_(dateIso) + '</h2>';
+  if (restaurants.length === 0) {
+    html += '<p>No menu data for this day.</p>';
+    return html;
+  }
+  restaurants.forEach(function (restaurant) {
+    html += '<h3>' + escapeHtml_(restaurant.name) + '</h3>';
+    var meta = [restaurant.address, restaurant.lunchHours].filter(Boolean).join(' • ');
+    if (meta) {
+      html += '<p>' + escapeHtml_(meta) + '</p>';
+    }
+    html += '<ul>';
+    restaurant.items.forEach(function (item) {
+      var label = (item.order ? escapeHtml_(item.order) + '. ' : '') + escapeHtml_(item.name) +
+        (item.price ? ' — ' + escapeHtml_(item.price) : '');
+      html += item.favourite
+        ? '<li><strong style="background-color:#fff3a0">' + label + '</strong></li>'
+        : '<li>' + label + '</li>';
+    });
+    html += '</ul>';
+  });
+  return html;
+}
+
 function sendSummaryEmail(entries) {
   if (entries.length === 0) return;
   var favouriteFoods = getFavouriteFoods();
@@ -58,5 +83,5 @@ function sendFetchFailureAlert_(restaurant, failureCount, errorMessage) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { buildSummaryEmailBody_, buildFetchFailureAlertBody_ };
+  module.exports = { buildSummaryEmailBody_, buildFetchFailureAlertBody_, buildDayMenuHtml_ };
 }
